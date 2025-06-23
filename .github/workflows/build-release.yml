@@ -81,9 +81,29 @@ jobs:
       - name: Install project
         run: meson install -C build
 
-      # 6. 上传编译产物 (Upload Artifact)
-      - name: Upload Artifacts
+      # 6. 打包所有依赖
+      - name: Package Windows Dependencies
+        if: runner.os == 'Windows'
+        run: |
+          # 创建一个临时目录来存放所有需要的 DLL
+          mkdir dependencies_pack
+          # 复制编译的 libass DLL
+          cp install_dir/bin/*.dll dependencies_pack/
+          # 从 MSYS2 的 bin 目录中复制所有依赖的 DLL
+          # 使用 find 和 xargs 来处理，即使文件不存在也不会报错
+          find /mingw64/bin -name "*.dll" | xargs -I {} cp {} dependencies_pack/
+        shell: msys2 {0}
+      
+      # 上传两个包
+      - name: Upload Core Artifact
         uses: actions/upload-artifact@v4
         with:
           name: libass-build-${{ matrix.name }}
           path: ${{ github.workspace }}/install_dir/
+      
+      - name: Upload Windows Bundle with Dependencies
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libass-bundle-windows
+          path: dependencies_pack/ # 上传刚刚创建的依赖包
