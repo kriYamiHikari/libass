@@ -1,0 +1,63 @@
+name: Build and Release libass
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            build_args: '-Ddefault_library=shared'
+
+          - name: Ubuntu
+            os: ubuntu-latest
+            build_args: '-Ddefault_library=shared'
+            
+          - name: macOS
+            os: macos-latest
+            build_args: '-Ddefault_library=shared'
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            python -m pip install meson ninja
+            choco install nasm
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            brew install meson ninja nasm pkg-config freetype fontconfig harfbuzz fribidi
+          elif [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ninja-build meson nasm build-essential pkg-config \
+              libfreetype-dev libfontconfig-dev libharfbuzz-dev libfribidi-dev
+          fi
+        shell: bash
+
+      - name: Configure build
+        run: |
+          meson setup build --prefix=${{ github.workspace }}/install_dir ${{ matrix.build_args }} -Dtest=false
+        shell: bash
+
+      - name: Compile project
+        run: meson compile -C build
+        shell: bash
+
+      - name: Install project
+        run: meson install -C build
+        shell: bash
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libass-build-${{ matrix.name }}
+          path: ${{ github.workspace }}/install_dir/
