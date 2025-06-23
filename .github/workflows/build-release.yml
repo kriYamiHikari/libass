@@ -1,12 +1,15 @@
 name: Build and Release libass
 
 on:
+  # 允许你手动从 GitHub Actions 页面触发此工作流
   workflow_dispatch:
+  # 当向 master 或 main 分支推送时也自动触发
   push:
     branches: [ master, main ]
 
 jobs:
   build:
+    # 为下面的每个平台都运行一次此作业
     strategy:
       fail-fast: false
       matrix:
@@ -23,39 +26,49 @@ jobs:
             os: macos-latest
             build_args: '-Ddefault_library=shared'
 
+    # 使用矩阵中指定的操作系统虚拟机
     runs-on: ${{ matrix.os }}
     
     steps:
+      # 1. 检出你的仓库代码
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2. 安装编译依赖
       - name: Install Dependencies
         run: |
           if [ "${{ runner.os }}" == "Windows" ]; then
+            # 在 Windows 上安装 Meson, Ninja 和 NASM
             python -m pip install meson ninja
             choco install nasm
           elif [ "${{ runner.os }}" == "macOS" ]; then
+            # 在 macOS 上使用 Homebrew 安装依赖
             brew install meson ninja nasm pkg-config freetype fontconfig harfbuzz fribidi
           elif [ "${{ runner.os }}" == "Linux" ]; then
+            # 在 Ubuntu 上使用 apt 安装依赖
             sudo apt-get update
             sudo apt-get install -y ninja-build meson nasm build-essential pkg-config \
               libfreetype-dev libfontconfig-dev libharfbuzz-dev libfribidi-dev
           fi
         shell: bash
 
+      # 3. 配置项目 (Meson Setup)
       - name: Configure build
         run: |
-          meson setup build --prefix=${{ github.workspace }}/install_dir ${{ matrix.build_args }} -Dtest=false
+          meson setup build --prefix="${{ github.workspace }}/install_dir" ${{ matrix.build_args }} -Dtest=disabled
         shell: bash
 
+      # 4. 编译项目 (Meson Compile)
       - name: Compile project
         run: meson compile -C build
         shell: bash
 
+      # 5. 安装项目 (Meson Install)
       - name: Install project
         run: meson install -C build
         shell: bash
 
+      # 6. 上传编译产物 (Upload Artifact)
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
